@@ -1,36 +1,52 @@
 # Loki + Grafana + Flask Observability Demo
 
-Учебный проект для развёртывания локального стека наблюдаемости:
+Учебный mini-project по развёртыванию стека наблюдаемости: **Flask-приложение отправляет структурированные логи в Loki, а Grafana автоматически показывает их на dashboard**.
 
-- **Loki** принимает логи через HTTP Push API.
-- **Grafana** автоматически подключает Loki как Data Source.
-- **Flask-приложение** отправляет логи в Loki через функцию `send_log_to_loki`.
-- **Dashboard** создаётся автоматически и показывает последние логи + распределение логов по уровню.
+Проект выполнен не как минимальная лабораторная работа, а как небольшой демонстрационный стенд для портфолио: всё поднимается через Docker Compose, Grafana получает Loki datasource автоматически, dashboard создаётся через provisioning, а приложение умеет генерировать тестовые логи разных уровней.
 
-## Портфолио-фича
+---
 
-**Observability Demo Pack**: проект запускается одной командой и сразу содержит готовый Grafana Data Source, dashboard и генератор тестовых логов.
+## Что показывает проект
 
-Это делает проект демонстрационным: можно показать полный путь данных:
+Проект демонстрирует базовый сценарий observability для backend-приложения:
 
 ```text
-Flask endpoint -> send_log_to_loki -> Loki Push API -> Loki labels -> Grafana dashboard
+Flask app → send_log_to_loki → Loki → Grafana datasource → Grafana dashboard
 ```
+
+После запуска можно увидеть:
+
+* последние логи приложения в Grafana;
+* распределение логов по уровням `debug`, `info`, `warning`, `error`;
+* работающую отправку логов через Loki Push API;
+* автоматическое подключение Loki Data Source в Grafana;
+* готовый dashboard без ручной настройки через интерфейс Grafana.
+
+---
+
+## Стек
+
+* **Python 3.12**
+* **Flask**
+* **Docker / Docker Compose**
+* **Grafana**
+* **Grafana Loki**
+* **LogQL**
+* **Grafana provisioning**
+
+---
 
 ## Структура проекта
 
 ```text
 loki-grafana-logs-demo/
 ├── app/
-│   ├── app.py                 # Flask endpoints
-│   ├── loki_client.py          # send_log_to_loki и сборка Loki payload
-│   ├── log_generator.py        # генератор демонстрационных логов
+│   ├── app.py
+│   ├── loki_client.py
+│   ├── log_generator.py
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── .dockerignore
-├── docs/
-│   ├── ACCEPTANCE_CHECKLIST.md
-│   └── CODEX_LOCAL_CHECK_PROMPT.md
 ├── grafana/
 │   ├── dashboards/
 │   │   └── loki-app-logs-dashboard.json
@@ -41,18 +57,18 @@ loki-grafana-logs-demo/
 │           └── loki.yml
 ├── loki/
 │   └── loki-config.yml
+├── docs/
+│   ├── ACCEPTANCE_CHECKLIST.md
+│   └── CODEX_LOCAL_CHECK_PROMPT.md
 ├── docker-compose.yml
 ├── .env.example
 ├── .gitignore
 └── README.md
 ```
 
+---
+
 ## Быстрый запуск
-
-Требования:
-
-- Docker Desktop запущен.
-- Порты `3000`, `3100`, `5000` свободны.
 
 Из корня проекта:
 
@@ -63,68 +79,53 @@ docker compose up -d --build
 Проверить контейнеры:
 
 ```bash
-docker ps
+docker compose ps
 ```
 
-Ожидаемые сервисы:
+Ожидаемый результат: сервисы `loki`, `grafana` и `app` должны быть в состоянии `Up` / `running`.
 
-- `grafana-demo` — Grafana на <http://localhost:3000>
-- `loki-demo` — Loki на <http://localhost:3100>
-- `flask-loki-demo-app` — Flask на <http://localhost:5000>
+---
 
-## Доступ в Grafana
+## Доступные сервисы
 
-Открой:
+| Сервис    | URL                                            | Назначение          |
+| --------- | ---------------------------------------------- | ------------------- |
+| Flask app | [http://localhost:5000](http://localhost:5000) | Тестовое приложение |
+| Grafana   | [http://localhost:3000](http://localhost:3000) | Dashboard логов     |
+| Loki      | [http://localhost:3100](http://localhost:3100) | Хранилище логов     |
+
+Доступ в Grafana по умолчанию:
 
 ```text
-http://localhost:3000
+login: admin
+password: admin
 ```
 
-Логин по умолчанию:
+При первом входе Grafana может предложить сменить пароль. Для локальной демонстрации можно пропустить этот шаг или задать временный пароль.
 
-```text
-admin / admin
-```
+---
 
-После входа открой dashboard:
+## Endpoint'ы Flask-приложения
 
-```text
-Dashboards -> Loki Demo -> Loki App Logs Demo
-```
+| Endpoint                  | Описание                                         |
+| ------------------------- | ------------------------------------------------ |
+| `/`                       | Главная проверка приложения и отправка demo-лога |
+| `/info`                   | Информация о приложении и Loki push URL          |
+| `/calc/<a>/<b>`           | Пример endpoint'а с вычислением                  |
+| `/log/info`               | Отправить один `info` лог                        |
+| `/log/warning`            | Отправить один `warning` лог                     |
+| `/log/error`              | Отправить один `error` лог                       |
+| `/generate-logs?count=30` | Сгенерировать пачку тестовых логов               |
 
-Data Source Loki создаётся автоматически через provisioning.
-
-## Генерация тестовых логов
-
-Открой в браузере или вызови через curl:
+Пример генерации логов:
 
 ```bash
-curl http://localhost:5000/
-curl http://localhost:5000/info
-curl http://localhost:5000/calc/2/3
-curl http://localhost:5000/log/info
-curl http://localhost:5000/log/warning
-curl http://localhost:5000/log/error
 curl "http://localhost:5000/generate-logs?count=30"
 ```
 
-После этого обнови dashboard в Grafana.
+---
 
-## Основные LogQL-запросы
-
-Последние логи приложения:
-
-```logql
-{app="my_app"}
-```
-
-Распределение логов по уровню за выбранный диапазон времени:
-
-```logql
-sum by (level) (count_over_time({app="my_app"}[$__range]))
-```
-
-## Проверка Loki напрямую
+## Проверка Loki
 
 Проверить готовность Loki:
 
@@ -132,13 +133,13 @@ sum by (level) (count_over_time({app="my_app"}[$__range]))
 curl http://localhost:3100/ready
 ```
 
-Посмотреть labels:
+Проверить labels:
 
 ```bash
 curl http://localhost:3100/loki/api/v1/labels
 ```
 
-Если логи уже отправлены, среди labels должны появиться:
+После генерации логов среди labels должны появиться:
 
 ```text
 app
@@ -146,151 +147,220 @@ env
 level
 ```
 
-## Что реализовано по заданию
-
-### Часть 1. Развёртывание стека и подключение источника
-
-- `docker-compose.yml` поднимает `loki` и `grafana`.
-- Loki доступен внутри compose-сети как `http://loki:3100`.
-- Grafana доступна с хоста как `http://localhost:3000`.
-- Data Source Loki создаётся автоматически через `grafana/provisioning/datasources/loki.yml`.
-
-### Часть 2. Визуализация логов в Grafana
-
-Dashboard содержит две панели:
-
-1. **Последние логи приложения `{app="my_app"}`**.
-2. **Pie chart распределения логов по `level`**.
-
-### Часть 3. Интеграция отправки логов
-
-В `app/loki_client.py` реализована функция:
-
-```python
-send_log_to_loki(level: str, message: str, **fields)
-```
-
-Она отправляет POST-запрос на:
+Пример значений:
 
 ```text
-/loki/api/v1/push
+app="my_app"
+level="debug" | "info" | "warning" | "error"
 ```
 
-## Важные технические решения
+---
 
-### Почему внутри Docker используется `http://loki:3100`
+## Grafana Dashboard
 
-Контейнер Flask-приложения находится в одной Docker Compose-сети с Loki. Поэтому из контейнера приложения надо обращаться к Loki по имени сервиса:
+После запуска проекта Grafana автоматически получает:
+
+1. **Loki Data Source**
+   URL внутри Docker Compose network:
+
+   ```text
+   http://loki:3100
+   ```
+
+2. **Dashboard: Loki App Logs Demo**
+
+В dashboard есть две основные панели:
+
+* таблица последних логов по запросу:
+
+  ```logql
+  {app="my_app"}
+  ```
+
+* круговая диаграмма распределения логов по уровню:
+
+  ```logql
+  sum by (level) (
+    count_over_time({app="my_app"}[$__range])
+  )
+  ```
+
+Для просмотра:
 
 ```text
-http://loki:3100/loki/api/v1/push
+Grafana → Dashboards → Loki Demo → Loki App Logs Demo
 ```
 
-`localhost` внутри контейнера приложения указывал бы на сам контейнер приложения, а не на Loki.
+Рекомендуемый time range:
 
-### Почему timestamp передаётся строкой
-
-В Loki Push API timestamp должен быть строкой. В проекте используется:
-
-```python
-str(time.time_ns())
+```text
+Last 1 hour
 ```
 
-Это Unix timestamp в наносекундах.
+После генерации логов нажать **Refresh**.
 
-### Почему labels не перегружены
+---
 
-В labels вынесены только стабильные поля:
+## Что было проверено локально
 
-- `app`
-- `env`
-- `level`
+Проект был проверен локально через Docker Desktop + WSL.
 
-Детали запроса и дополнительные поля записываются внутрь JSON log line. Это снижает риск высокой кардинальности labels.
+Проверки:
 
-## Типовые проблемы и решения
+* `python -m py_compile app/*.py`
+* `docker compose config`
+* `docker compose up -d --build`
+* `docker compose ps`
+* `curl http://localhost:3100/ready`
+* `curl http://localhost:5000/`
+* `curl http://localhost:5000/info`
+* `curl "http://localhost:5000/generate-logs?count=30"`
+* `curl http://localhost:3100/loki/api/v1/labels`
+* проверка Loki labels: `app`, `env`, `level`
+* проверка Loki query по `{app="my_app"}`
+* проверка Grafana datasource через API
+* проверка Grafana dashboard через API
+* визуальная проверка dashboard в браузере
 
-### Grafana открывается, но dashboard пустой
+Фактический результат проверки:
 
-Сначала сгенерируй логи:
+* контейнеры `loki`, `grafana`, `app` запущены;
+* Flask отвечает на запросы;
+* Loki принимает логи и возвращает `204` на push;
+* labels появляются в Loki;
+* Grafana datasource создаётся автоматически;
+* dashboard создаётся автоматически;
+* таблица логов и круговая диаграмма отображаются в Grafana UI.
 
-```bash
-curl "http://localhost:5000/generate-logs?count=30"
+---
+
+## Зачем это нужно в реальных проектах
+
+Такой подход используется, когда приложение работает не только локально в терминале, а как сервис: в контейнере, на сервере, у клиента или в production-среде.
+
+Логи помогают понять:
+
+* что произошло в приложении;
+* когда произошла ошибка;
+* какой компонент её вызвал;
+* увеличилось ли количество ошибок после обновления;
+* какие операции проходят успешно, а какие ломаются.
+
+Примеры реального применения:
+
+* мониторинг backend API;
+* наблюдение за Telegram-ботами;
+* контроль интеграций с внешними API;
+* диагностика ошибок в Docker-контейнерах;
+* анализ поведения приложения после релиза.
+
+---
+
+## Особенности реализации
+
+### Структурированные labels
+
+Логи отправляются в Loki с labels:
+
+```text
+app="my_app"
+env="demo"
+level="info" / "warning" / "error" / "debug"
 ```
 
-Потом обнови dashboard и проверь диапазон времени: `Last 1 hour`.
+Это позволяет удобно фильтровать данные в LogQL.
 
-### Loki datasource сообщает, что labels отсутствуют
+### Безопасность
 
-Проверь:
+В проекте не используются секретные ключи и токены. Настройки вынесены в `.env.example` и переменные окружения.
 
-1. Приложение реально отправляло логи.
-2. Внутренний URL в контейнере приложения: `http://loki:3100/loki/api/v1/push`.
-3. Контейнеры находятся в одной compose-сети.
-4. `curl http://localhost:3100/loki/api/v1/labels` возвращает labels после генерации логов.
+Важно: это локальный учебный стенд. В production нельзя оставлять Grafana с доступом `admin/admin`, а также нельзя логировать пароли, токены, приватные сообщения, персональные и платёжные данные.
 
-### Порт 3000, 3100 или 5000 занят
+### Надёжность
 
-Останови конфликтующий сервис или измени порт в `docker-compose.yml`.
+Если Loki временно недоступен, Flask-приложение не падает. Функция `send_log_to_loki` возвращает структурированный результат доставки лога.
 
-Например, для Grafana:
+---
 
-```yaml
-ports:
-  - "3001:3000"
-```
+## Остановка проекта
 
-Тогда Grafana будет доступна на `http://localhost:3001`.
-
-### Полностью пересоздать стек
-
-```bash
-docker compose down -v
-docker compose up -d --build
-```
-
-Команда `down -v` удалит volume с данными Loki и Grafana.
-
-## Как остановить проект
-
-Остановить контейнеры, сохранив volumes:
+Остановить контейнеры:
 
 ```bash
 docker compose down
 ```
 
-Остановить и удалить данные:
+Остановить контейнеры и удалить volumes с данными Grafana/Loki:
 
 ```bash
 docker compose down -v
 ```
 
-## Локальная проверка через Codex
+Обычно для разработки достаточно:
 
-После распаковки проекта можно открыть папку в VS Code и дать Codex запрос из файла:
-
-```text
-docs/CODEX_LOCAL_CHECK_PROMPT.md
+```bash
+docker compose down
 ```
 
-Codex должен запускать и проверять проект именно в твоей локальной Windows/Docker Desktop среде.
+---
 
-## Ограничения
+## Возможные проблемы
 
-- Проект предназначен для локального учебного запуска, не для production.
-- Авторизация Loki отключена: `auth_enabled: false`.
-- Grafana использует demo-логин `admin/admin`.
-- Retention Loki настроен как короткий demo-режим.
-- Для production понадобятся авторизация, TLS, секреты вне репозитория, backup, resource limits, monitoring самого стека.
+### Docker Desktop не запущен
 
-## Project status: locally tested
+Если появляется ошибка подключения к Docker Engine или `dockerDesktopLinuxEngine`, нужно открыть Docker Desktop вручную и дождаться статуса `Docker Desktop is running`.
 
-Verified:
-- docker compose up -d --build
-- Loki /ready
-- Flask endpoints
-- log generation
-- Loki labels
-- Grafana datasource provisioning
-- Grafana dashboard provisioning
-- visual check in Grafana UI
+### В WSL не работает обычный docker
+
+В некоторых конфигурациях WSL может потребоваться использовать Docker Desktop CLI из Windows или включить WSL Integration в настройках Docker Desktop.
+
+### В Grafana нет логов
+
+Проверить:
+
+1. были ли сгенерированы логи;
+2. работает ли Loki `/ready`;
+3. есть ли labels в Loki;
+4. выбран ли в Grafana time range `Last 1 hour`;
+5. нажата ли кнопка `Refresh`.
+
+### Loki падает из-за compactor / retention
+
+В некоторых версиях Loki при включённом retention требуется корректная настройка compactor. В проекте конфигурация Loki уже адаптирована для локального demo-запуска.
+
+---
+
+## Статус проекта
+
+Проект завершён как учебный mini-project и может использоваться как демонстрационный пример для GitHub/портфолио.
+
+Он показывает навыки:
+
+* Docker Compose;
+* запуск нескольких сервисов в одной сети;
+* Flask backend;
+* отправка логов через HTTP API;
+* Loki Push API;
+* LogQL;
+* Grafana provisioning;
+* создание dashboard;
+* базовая observability-инфраструктура для приложения.
+
+---
+
+## Возможные улучшения
+
+Идеи для развития проекта:
+
+* добавить Promtail или Alloy для сбора логов из файлов/контейнеров;
+* добавить Grafana alerts для ошибок уровня `error`;
+* добавить метрики приложения через Prometheus;
+* добавить OpenTelemetry tracing;
+* добавить отдельные dashboards для API latency и error rate;
+* подготовить production-вариант с авторизацией, retention policy и безопасным хранением конфигурации.
+
+---
+
+## Краткое резюме
+
+Этот проект показывает, как превратить обычное Flask-приложение в наблюдаемый сервис: приложение отправляет события в Loki, а Grafana визуализирует техническое состояние системы в dashboard.
