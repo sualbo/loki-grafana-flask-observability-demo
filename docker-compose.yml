@@ -1,0 +1,58 @@
+services:
+  loki:
+    image: ${LOKI_IMAGE:-grafana/loki:3.7.0}
+    container_name: loki-demo
+    command: -config.file=/etc/loki/loki-config.yml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki-data:/loki
+    networks:
+      - observability
+    restart: unless-stopped
+
+  grafana:
+    image: ${GRAFANA_IMAGE:-grafana/grafana:latest}
+    container_name: grafana-demo
+    depends_on:
+      - loki
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_LOG_LEVEL: warn
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - observability
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ./app
+    container_name: flask-loki-demo-app
+    depends_on:
+      - loki
+    ports:
+      - "5000:5000"
+    environment:
+      APP_NAME: ${APP_NAME:-my_app}
+      APP_ENV: ${APP_ENV:-demo}
+      LOKI_PUSH_URL: ${LOKI_PUSH_URL:-http://loki:3100/loki/api/v1/push}
+      LOKI_TIMEOUT_SECONDS: ${LOKI_TIMEOUT_SECONDS:-3}
+    networks:
+      - observability
+    restart: unless-stopped
+
+networks:
+  observability:
+    driver: bridge
+
+volumes:
+  loki-data:
+  grafana-data:
